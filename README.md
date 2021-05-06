@@ -17,3 +17,4 @@ var (forgroundColor, backgroundColor, _, _, _, _) = list.First();
 ```
 
 You can also look in the provided sample.
+![Screenshot](docs/Screenshot Sample.png)
