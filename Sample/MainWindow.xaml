@@ -34,10 +34,11 @@
                     <TextBlock
                         x:Name="SampleForeground"
                         Padding="5"
+                        HorizontalAlignment="Center"
                         FontSize="28"
                         FontWeight="Light"
                         Foreground="{Binding ElementName=List, Path=SelectedItem.Forground}"
-                        Text="Playing" />
+                        Text="Click to load" />
                 </Border>
                 <Border
                     Grid.Column="0"
