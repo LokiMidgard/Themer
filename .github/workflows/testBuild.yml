@@ -77,3 +77,17 @@ jobs:
       run: dotnet publish Sample --runtime win-x86 --configuration Release --self-contained true -o publish/x86
     - name: Publish Framework Dependent (Net 5.0)
       run: dotnet publish Sample --framework net5.0-windows --configuration Release --self-contained false -o publish/net5.0
+
+    - name: List Artefacts library 
+      shell: powershell
+      run: get-childItem publish
+    - name: List Artefacts X64 
+      shell: powershell
+      run: get-childItem publish/x64
+    - name: List Artefacts X86 
+      shell: powershell
+      run: get-childItem publish/x86
+    - name: List Artefacts Framework 
+      shell: powershell
+      run: get-childItem publish/net5.0
+
