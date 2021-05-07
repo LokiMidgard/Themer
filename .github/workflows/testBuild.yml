@@ -6,9 +6,9 @@ on:
       - Themer/**
       - Sample/**
       - .github/workflows/testBuild.yml
-    branches: [ develop ]
+    branches: [ development ]
   pull_request:
-    branches: [ develop ]
+    branches: [ development ]
 
 jobs:
   build:
