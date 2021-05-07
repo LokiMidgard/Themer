@@ -7,6 +7,18 @@
 		<Nullable>enable</Nullable>
 	</PropertyGroup>
 
+	<PropertyGroup>
+		<PackageId>Themer</PackageId>
+		<Description>A library to calculate forground and background colors from an image.</Description>
+		<PackageTags>Theme; Vibrant; Color, Forground; Background</PackageTags>
+		<IncludeSymbols>true</IncludeSymbols>
+		<Authors>Patrick Kranz</Authors>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageProjectUrl>https://github.com/LokiMidgard/Themer</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/LokiMidgard/Themer.git</RepositoryUrl>
+		<Copyright>Patrick Kranz</Copyright>
+	</PropertyGroup>
+	
 	<ItemGroup>
 		<PackageReference Include="system.drawing.common" Version="5.0.1" />
 		<PackageReference Include="System.Memory" Version="4.5.4" Condition="'$(TargetFramework)'=='netstandard2.0' or '$(TargetFramework)'=='netstandard2.1' or '$(TargetFramework)'=='netstandard1.6'" />
