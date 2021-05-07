@@ -1,0 +1,154 @@
+name: Test Build
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]*'
+  
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      with:  
+        fetch-depth: 0
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 5.0.x
+
+
+    - name: GitVersion
+      run: | 
+        dotnet tool install --global GitVersion.Tool --version 5.6.4
+        dotnet gitversion /output buildserver
+    - name: Disable GitVersionTask on builds
+      run: |
+        set-content -Path Directory.build.props -Value '<?xml version="1.0" encoding="utf-8"?>
+        <Project>
+          <PropertyGroup>
+            <LangVersion>latest</LangVersion>
+            <Authors>foo</Authors>
+            <Company>foo</Company>
+            <PackageProjectUrl>foo</PackageProjectUrl>
+            <RepositoryUrl>foo</RepositoryUrl>
+            <RepositoryType>git</RepositoryType>
+            <NoWarn>CS0618;CS1591;CS1701;CS8618;CS8632;NU5048;NU5105;NU5125</NoWarn>
+          </PropertyGroup>
+          <PropertyGroup Condition=" ''$(GitVersion_SemVer)'' != ''''">
+            <GetVersion>false</GetVersion>
+            <WriteVersionInfoToBuildLog>false</WriteVersionInfoToBuildLog>
+            <UpdateAssemblyInfo>false</UpdateAssemblyInfo>
+            <GenerateGitVersionInformation>false</GenerateGitVersionInformation>
+            <Version>$(GitVersion_FullSemVer)</Version>
+            <VersionPrefix>$(GitVersion_MajorMinorPatch)</VersionPrefix>
+            <VersionSuffix Condition=" ''$(UseFullSemVerForNuGet)'' == ''false'' ">$(GitVersion_NuGetPreReleaseTag)</VersionSuffix>
+            <VersionSuffix Condition=" ''$(UseFullSemVerForNuGet)'' == ''true'' ">$(GitVersion_PreReleaseTag)</VersionSuffix>
+            <PackageVersion Condition=" ''$(UseFullSemVerForNuGet)'' == ''false'' ">$(GitVersion_NuGetVersion)</PackageVersion>
+            <PackageVersion Condition=" ''$(UseFullSemVerForNuGet)'' == ''true'' ">$(GitVersion_FullSemVer)</PackageVersion>
+            <InformationalVersion Condition=" ''$(InformationalVersion)'' == '''' ">$(GitVersion_InformationalVersion)</InformationalVersion>
+            <AssemblyVersion Condition=" ''$(AssemblyVersion)'' == '''' ">$(GitVersion_AssemblySemVer)</AssemblyVersion>
+            <FileVersion Condition=" ''$(FileVersion)'' == '''' ">$(GitVersion_AssemblySemFileVer)</FileVersion>
+            <RepositoryBranch Condition=" ''$(RepositoryBranch)'' == '''' ">$(GitVersion_BranchName)</RepositoryBranch>
+            <RepositoryCommit Condition=" ''$(RepositoryCommit)'' == '''' ">$(GitVersion_Sha)</RepositoryCommit>
+          </PropertyGroup>
+        </Project>'
+      
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --no-restore
+#    - name: Test
+#      run: dotnet test --no-build --verbosity normal
+
+    - name: Build Library
+      run: dotnet pack .\Themer -o publish/
+    - name: Publish X64
+      run: dotnet publish Sample --runtime win-x64 --configuration Release --self-contained true -o publish/x64
+    - name: Publish X86
+      run: dotnet publish Sample --runtime win-x86 --configuration Release --self-contained true -o publish/x86
+    - name: Publish Framework Dependent (Net 5.0)
+      run: dotnet publish Sample --framework net5.0-windows --configuration Release --self-contained false -o publish/net5.0
+
+    - name: Pack X64
+      run: compress-archive publish/x64 publish/Sample-${{ env.GitVersion_FullSemVer }}-x64.zip
+    - name: Pack X86
+      run: compress-archive publish/x86 publish/Sample-${{ env.GitVersion_FullSemVer }}-x86.zip
+    - name: Pack Framework Dependent (Net 5.0)
+      run: compress-archive publish/net5.0 publish/Sample-${{ env.GitVersion_FullSemVer }}-net5.0.zip      
+
+    - name: Create Release
+      uses: actions/create-release@v1.1.4
+      id: create_release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+      with:
+        # The name of the tag. This should come from the webhook payload, `github.GITHUB_REF` when a user pushes a new tag
+        tag_name: ${{ github.ref }}
+        # The name of the release. For example, `Release v1.0.1`
+        release_name: Release ${{ env.GitVersion_FullSemVer }}
+
+    - name: Upload Release Asset x64
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: ./publish/Sample-${{ env.GitVersion_FullSemVer }}-x64.zip
+        asset_name: Dample-${{ env.GitVersion_FullSemVer }}-x64.zip
+        asset_content_type: application/x-compressed
+
+    - name: Upload Release Asset x86
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: ./publish/Sample-${{ env.GitVersion_FullSemVer }}-x86.zip
+        asset_name: Sample-${{ env.GitVersion_FullSemVer }}-x86.zip
+        asset_content_type: application/x-compressed
+
+    - name: Upload Release Asset .Net 5.0
+      id: upload-release-asset 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: ./publish/Sample-${{ env.GitVersion_FullSemVer }}-net5.0.zip
+        asset_name: Sample-${{ env.GitVersion_FullSemVer }}-net5.0.zip
+        asset_content_type: application/x-compressed
+
+    - name: Upload Release Asset nuget
+      id: upload-release-asset-nuget 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: ./publish/Themer.${{ env.GitVersion_FullSemVer }}.nupkg
+        asset_name: Themer.${{ env.GitVersion_FullSemVer }}.nupkg
+        asset_content_type: application/x-compressed
+
+    - name: Upload Release Asset nuget-symbols
+      id: upload-release-asset-nuget-symbols 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: ./publish/Themer.${{ env.GitVersion_FullSemVer }}.symbols.nupkg
+        asset_name: Themer.${{ env.GitVersion_FullSemVer }}.symbols.nupkg
+        asset_content_type: application/x-compressed
+
+    - name: Publish Nuget Packages
+      run: |
+        dotnet nuget push ./publish/Themer.${{ env.GitVersion_FullSemVer }}.nupkg -k ${{ secrets.NUGETAPIKEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate   
+        dotnet nuget push ./publish/Themer.${{ env.GitVersion_FullSemVer }}.symbols.nupkg -k ${{ secrets.NUGETAPIKEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate   
+      
+      
