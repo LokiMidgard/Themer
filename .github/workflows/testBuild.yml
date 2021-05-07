@@ -1,0 +1,93 @@
+name: Test Build
+
+on:
+  push:
+    paths:
+      - Themer/**
+      - Sample/**
+      - .github/workflows/testBuild.yml
+    branches: [ development ]
+  pull_request:
+    branches: [ development ]
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      with:  
+        fetch-depth: 0
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 5.0.x
+
+
+    - name: GitVersion
+      run: | 
+        dotnet tool install --global GitVersion.Tool --version 5.6.4
+        dotnet gitversion /output buildserver
+    - name: Disable GitVersionTask on builds
+      run: |
+        set-content -Path Directory.build.props -Value '<?xml version="1.0" encoding="utf-8"?>
+        <Project>
+          <PropertyGroup>
+            <LangVersion>latest</LangVersion>
+            <Authors>foo</Authors>
+            <Company>foo</Company>
+            <PackageProjectUrl>foo</PackageProjectUrl>
+            <RepositoryUrl>foo</RepositoryUrl>
+            <RepositoryType>git</RepositoryType>
+            <NoWarn>CS0618;CS1591;CS1701;CS8618;CS8632;NU5048;NU5105;NU5125</NoWarn>
+          </PropertyGroup>
+          <PropertyGroup Condition=" ''$(GitVersion_SemVer)'' != ''''">
+            <GetVersion>false</GetVersion>
+            <WriteVersionInfoToBuildLog>false</WriteVersionInfoToBuildLog>
+            <UpdateAssemblyInfo>false</UpdateAssemblyInfo>
+            <GenerateGitVersionInformation>false</GenerateGitVersionInformation>
+            <Version>$(GitVersion_FullSemVer)</Version>
+            <VersionPrefix>$(GitVersion_MajorMinorPatch)</VersionPrefix>
+            <VersionSuffix Condition=" ''$(UseFullSemVerForNuGet)'' == ''false'' ">$(GitVersion_NuGetPreReleaseTag)</VersionSuffix>
+            <VersionSuffix Condition=" ''$(UseFullSemVerForNuGet)'' == ''true'' ">$(GitVersion_PreReleaseTag)</VersionSuffix>
+            <PackageVersion Condition=" ''$(UseFullSemVerForNuGet)'' == ''false'' ">$(GitVersion_NuGetVersion)</PackageVersion>
+            <PackageVersion Condition=" ''$(UseFullSemVerForNuGet)'' == ''true'' ">$(GitVersion_FullSemVer)</PackageVersion>
+            <InformationalVersion Condition=" ''$(InformationalVersion)'' == '''' ">$(GitVersion_InformationalVersion)</InformationalVersion>
+            <AssemblyVersion Condition=" ''$(AssemblyVersion)'' == '''' ">$(GitVersion_AssemblySemVer)</AssemblyVersion>
+            <FileVersion Condition=" ''$(FileVersion)'' == '''' ">$(GitVersion_AssemblySemFileVer)</FileVersion>
+            <RepositoryBranch Condition=" ''$(RepositoryBranch)'' == '''' ">$(GitVersion_BranchName)</RepositoryBranch>
+            <RepositoryCommit Condition=" ''$(RepositoryCommit)'' == '''' ">$(GitVersion_Sha)</RepositoryCommit>
+          </PropertyGroup>
+        </Project>'
+      
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --no-restore
+#    - name: Test
+#      run: dotnet test --no-build --verbosity normal
+
+    - name: Build Library
+      run: dotnet pack .\Themer -o publish/
+    - name: Publish X64
+      run: dotnet publish Sample --runtime win-x64 --configuration Release --self-contained true -o publish/x64
+    - name: Publish X86
+      run: dotnet publish Sample --runtime win-x86 --configuration Release --self-contained true -o publish/x86
+    - name: Publish Framework Dependent (Net 5.0)
+      run: dotnet publish Sample --framework net5.0-windows --configuration Release --self-contained false -o publish/net5.0
+
+    - name: List Artefacts library 
+      shell: powershell
+      run: get-childItem publish
+    - name: List Artefacts X64 
+      shell: powershell
+      run: get-childItem publish/x64
+    - name: List Artefacts X86 
+      shell: powershell
+      run: get-childItem publish/x86
+    - name: List Artefacts Framework 
+      shell: powershell
+      run: get-childItem publish/net5.0
+
